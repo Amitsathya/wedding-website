@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(del \"C:\\Users\\Amit\\Downloads\\WeddingWebsite\\frontend\\components\\ui\\sidebar.jsx\")",
+      "Bash(del \"C:\\Users\\Amit\\Downloads\\WeddingWebsite\\frontend\\components\\ui\\separator.jsx\")",
+      "Bash(del \"C:\\Users\\Amit\\Downloads\\WeddingWebsite\\frontend\\components\\ui\\sheet.jsx\")",
+      "Bash(del \"C:\\Users\\Amit\\Downloads\\WeddingWebsite\\frontend\\components\\ui\\skeleton.jsx\")",
+      "Bash(del \"C:\\Users\\Amit\\Downloads\\WeddingWebsite\\frontend\\components\\ui\\tooltip.jsx\")",
+      "Bash(npm run dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
