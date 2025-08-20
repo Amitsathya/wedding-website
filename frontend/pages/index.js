@@ -21,7 +21,7 @@ export default function Home() {
     bride: 'Bharat',
     groom: 'Divya',
     date: 'December 24-25, 2025',
-    venue: 'Thottam & Palazzo Chakolas',
+    venue: ['Thottam', 'Palazzo Chakolas'],
     location: 'Thrissur, Kerala',
   });
 
@@ -29,6 +29,8 @@ export default function Home() {
   const arrowRef = useRef(null);
   const containerRef = useRef(null);
   const ourStoryRef = useRef(null);
+  const trailHistory = useRef([]);
+  const trailElements = useRef([]);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -119,15 +121,19 @@ export default function Home() {
     }));
   };
 
-  // Use useEffect to handle questionnaire visibility based on form data
+  // Use useEffect with debounce to handle questionnaire visibility
   useEffect(() => {
-    const shouldShowQuestionnaire =
-      formData.firstName.trim() &&
-      formData.lastName.trim() &&
-      formData.email.trim() &&
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
+    const timeoutId = setTimeout(() => {
+      const shouldShowQuestionnaire =
+        formData.firstName.trim() &&
+        formData.lastName.trim() &&
+        formData.email.trim() &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
 
-    setShowQuestionnaire(shouldShowQuestionnaire);
+      setShowQuestionnaire(shouldShowQuestionnaire);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [formData.firstName, formData.lastName, formData.email]);
 
   const handleQuestionnaireChange = (field, value) => {
@@ -209,7 +215,7 @@ export default function Home() {
     }));
   };
 
-  // GSAP Scroll Animation Setup
+  // Optimized GSAP Scroll Animation Setup
   useEffect(() => {
     if (typeof window !== 'undefined' && pathRef.current && arrowRef.current) {
       const path = pathRef.current;
@@ -217,80 +223,155 @@ export default function Home() {
       const pathLength = path.getTotalLength();
       const coupleImage = document.querySelector('[data-couple-image="true"]');
 
-      console.log('GSAP Setup:', { path, arrow, coupleImage, pathLength });
-
       // Set initial state
       gsap.set(path, { strokeDasharray: pathLength, strokeDashoffset: pathLength });
-      gsap.set(arrow, { opacity: 0 });
-      gsap.set(coupleImage, { opacity: 0 });
+      gsap.set(arrow, { opacity: 0, force3D: true });
+      gsap.set(coupleImage, { opacity: 0, force3D: true });
 
-      // Create the scroll animation that starts sooner and ends before Our Story section
+      // Pre-create trail elements for better performance
+      const svgContainer = containerRef.current?.querySelector('svg');
+      if (svgContainer && trailElements.current.length === 0) {
+        for (let i = 0; i < 4; i++) {
+          // Reduced trail elements
+          const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          const fireParticle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          const hotCore = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+
+          glow.setAttribute('class', 'fire-trail');
+          fireParticle.setAttribute('class', 'fire-trail');
+          hotCore.setAttribute('class', 'fire-trail');
+          glow.setAttribute('opacity', '0');
+          fireParticle.setAttribute('opacity', '0');
+          hotCore.setAttribute('opacity', '0');
+
+          svgContainer.appendChild(glow);
+          svgContainer.appendChild(fireParticle);
+          svgContainer.appendChild(hotCore);
+
+          trailElements.current.push({ glow, fireParticle, hotCore });
+        }
+      }
+
+      // Simplified and optimized scroll animation
       const isMobile = window.innerWidth < 768;
       const tl = gsap.timeline({
         scrollTrigger: {
-          trigger: '.hero-section', // Use hero section as trigger
-          start: 'bottom 80%', // Start when hero bottom is 80% from top
+          trigger: '.hero-section',
+          start: 'bottom 80%',
           end: isMobile
-            ? `bottom+=${window.innerHeight * 0.19} top`
-            : `bottom+=${window.innerHeight * 0.31} top`, // Relative to screen height
-          scrub: isMobile ? 2 : 1.5, // Slower scrub on mobile for better control
-          markers: false, // Show start/end markers for debugging
+            ? `bottom+=${window.innerHeight * 0.4} top`
+            : `bottom+=${window.innerHeight * 0.45} top`,
+          scrub: 0.5, // Much smoother scrub for fluid animation
+          markers: false, // Disable markers for production
+          // High-performance scroll handler with RAF
           onUpdate: (self) => {
-            const progress = self.progress;
-            const point = path.getPointAtLength(progress * pathLength);
+            // Use requestAnimationFrame for smooth 60fps updates
+            requestAnimationFrame(() => {
+              const progress = self.progress;
 
-            // Smooth opacity transitions
-            let opacity = Math.min(1, progress * 5); // Fade in pink flower quickly
+              // Simplified calculations
+              const point = path.getPointAtLength(progress * pathLength);
 
-            // Smooth ease in for photo, then stay visible
-            let imageOpacity = 0;
-            if (progress > 0.1 && progress <= 0.25) {
-              // Fast ease in from 10% to 25% of animation (sooner)
-              imageOpacity = (progress - 0.1) / 0.15; // 0 to 1 over 15% range
-            } else if (progress > 0.25) {
-              // Stay fully visible after ease in
-              imageOpacity = 1;
-            }
+              // Flower opacity - fade in early, fade out at end
+              let opacity = 0;
+              if (progress < 0.33) {
+                opacity = Math.min(1, progress * 3); // Fade in
+              } else if (progress > 0.85) {
+                opacity = Math.max(0, (1 - progress) * 6.67); // Fade out (1-0.85 = 0.15, so 1/0.15 = 6.67)
+              } else {
+                opacity = 1; // Full opacity in middle
+              }
 
-            gsap.set(arrow, {
-              x: point.x - 0, // Center the flower on the path
-              y: point.y - 0,
-              opacity: opacity,
-            });
+              // Simplified photo opacity
+              let imageOpacity = 0;
+              if (progress > 0.15) {
+                imageOpacity = Math.min(1, (progress - 0.15) * 3);
+              }
 
-            // Control couple image - move to position above Our Story when animation ends
-            if (progress >= 1.0) {
-              // Animation complete - position photo above Our Story section in document flow
-              const ourStoryRect = ourStoryRef.current?.getBoundingClientRect();
-              const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-              const mobileOffset = isMobile ? 150 : 200; // Smaller offset on mobile
-              const finalY = ourStoryRect
-                ? ourStoryRect.top + scrollTop - mobileOffset
-                : scrollTop + window.innerHeight * 0.7;
-
-              gsap.set(coupleImage, {
-                opacity: 1,
-                position: 'absolute',
-                left: '50%',
-                top: finalY + 'px',
-                transform: 'translate(-50%, -50%)',
-                zIndex: 30,
+              // GPU-accelerated batch DOM updates
+              gsap.set(arrow, {
+                x: point.x,
+                y: point.y,
+                opacity: opacity,
+                force3D: true,
+                transformOrigin: 'center center',
               });
-            } else {
-              // During animation - keep centered
-              gsap.set(coupleImage, {
-                opacity: imageOpacity,
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                zIndex: 30,
-              });
-            }
 
-            // Also fade out the entire SVG container earlier
-            gsap.set(containerRef.current?.querySelector('svg'), {
-              opacity: progress < 0.8 ? 0.4 : Math.max(0, (1 - progress) * 2),
+              // Simplified trail effect for better performance
+              if (opacity > 0 && trailElements.current.length > 0) {
+                // Update only first few trail elements for performance
+                const maxTrail = 4; // Reduced from 8
+                trailHistory.current.push({ x: point.x, y: point.y });
+
+                if (trailHistory.current.length > maxTrail) {
+                  trailHistory.current.shift();
+                }
+
+                // Batch DOM updates for better performance
+                const fragment = document.createDocumentFragment ? null : null;
+
+                trailHistory.current.forEach((pos, index) => {
+                  if (index < maxTrail && index < trailElements.current.length) {
+                    const trailOpacity = (index + 1) / maxTrail;
+                    const size = (index + 1) * 0.8; // Smaller particles
+                    const elements = trailElements.current[index];
+
+                    // Update only main particle for performance
+                    elements.fireParticle.setAttribute('cx', pos.x);
+                    elements.fireParticle.setAttribute('cy', pos.y);
+                    elements.fireParticle.setAttribute('r', size);
+                    elements.fireParticle.setAttribute('opacity', trailOpacity * 0.8);
+
+                    // Hide glow and core for performance
+                    elements.glow.setAttribute('opacity', '0');
+                    elements.hotCore.setAttribute('opacity', '0');
+                  }
+                });
+
+                // Hide remaining elements
+                for (let i = maxTrail; i < trailElements.current.length; i++) {
+                  const elements = trailElements.current[i];
+                  elements.fireParticle.setAttribute('opacity', '0');
+                }
+              } else if (trailElements.current.length > 0) {
+                // Hide all trail elements
+                trailElements.current.forEach((elements) => {
+                  elements.fireParticle.setAttribute('opacity', '0');
+                });
+              }
+
+              // Position photo higher up so it doesn't cover the flower path
+              if (progress >= 0.99) {
+                // Only at the very end (99%), position above Our Story
+                const ourStoryRect = ourStoryRef.current?.getBoundingClientRect();
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const mobileOffset = isMobile ? 120 : 160;
+                const finalY = ourStoryRect
+                  ? ourStoryRect.top + scrollTop - mobileOffset
+                  : scrollTop + window.innerHeight * 0.7;
+
+                gsap.set(coupleImage, {
+                  opacity: 1,
+                  position: 'absolute',
+                  left: '50%',
+                  top: finalY + 'px',
+                  transform: 'translate3d(-50%, -50%, 0)',
+                  zIndex: 30,
+                  force3D: true,
+                });
+              } else {
+                // Position photo higher up so flower path is visible below it
+                const topOffset = isMobile ? '35%' : '40%'; // Higher up on mobile
+                gsap.set(coupleImage, {
+                  opacity: imageOpacity,
+                  position: 'fixed',
+                  top: topOffset,
+                  left: '50%',
+                  transform: 'translate3d(-50%, -50%, 0)',
+                  zIndex: 30,
+                  force3D: true,
+                });
+              }
             });
           },
         },
@@ -314,38 +395,46 @@ export default function Home() {
       </Head>
 
       <main className="min-h-screen relative overflow-hidden">
-        {/* Continuous background with seamless gradients */}
+        {/* Simple background */}
         <div className="absolute inset-0 bg-background">
-          {/* Flowing gradient background elements */}
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/5 via-transparent to-primary/3"></div>
-          <div className="absolute top-20 left-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-          <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-primary/8 rounded-full blur-3xl animate-pulse delay-500"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-primary/5 to-primary/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-full h-96 bg-gradient-to-t from-primary/3 via-transparent to-transparent"></div>
+          {/* Enhanced breathing gradient background elements */}
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/12 via-primary/4 to-primary/8"></div>
+          <div className="absolute top-20 left-20 w-72 h-72 bg-primary/20 rounded-full blur-2xl animate-pulse"></div>
+          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-primary/15 rounded-full blur-2xl animate-pulse delay-1000"></div>
+          <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-primary/18 rounded-full blur-2xl animate-pulse delay-500"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-primary/12 to-primary/25 rounded-full blur-2xl animate-pulse delay-700"></div>
+          <div className="absolute top-10 right-10 w-64 h-64 bg-primary/22 rounded-full blur-2xl animate-pulse delay-300"></div>
+          <div className="absolute bottom-20 left-10 w-56 h-56 bg-primary/25 rounded-full blur-2xl animate-pulse delay-1200"></div>
+          <div className="absolute top-1/4 left-1/2 w-[400px] h-[400px] bg-primary/16 rounded-full blur-2xl animate-pulse delay-800"></div>
+          <div className="absolute bottom-1/3 right-1/3 w-[320px] h-[320px] bg-primary/20 rounded-full blur-2xl animate-pulse delay-400"></div>
+          <div className="absolute bottom-0 right-0 w-full h-96 bg-gradient-to-t from-primary/8 via-primary/3 to-transparent"></div>
 
-          {/* Japanese Sakura Petals - Wind-blown from right to left */}
-          {Array.from({ length: 500 }, (_, i) => {
-            const size = 0.4 + Math.random() * 1.8; // Size range: small to big (0.4x - 2.2x)
-            const startY = Math.random() * 1400; // Random vertical position 0-100vh
-            const animationDuration = 25 + Math.random() * 2; // 25-50 seconds for slow, natural drift
-            const animationDelay = Math.random() * 0; // 0-20 second delay for continuous flow
-            const drift = Math.random() * 80 - 40; // Vertical drift -40 to +40px
+          {/* Static Sakura Petals - fixed positions to prevent jumping */}
+          <div
+            id="sakura-container"
+            ref={(el) => {
+              // Only create petals once to prevent re-rendering issues
+              if (el && !el.hasChildNodes()) {
+                Array.from({ length: 25 }, (_, i) => {
+                  const size = 0.6 + ((i * 0.024) % 1.2); // Deterministic size based on index
+                  const startY = (i * 20) % 1000; // Deterministic Y position
+                  const animationDuration = 30 + ((i * 0.2) % 10); // Deterministic duration
+                  const animationDelay = (i * 0.8) % 30; // Spread delays over 30 seconds
+                  const drift = ((i * 5) % 60) - 30; // Deterministic drift
 
-            return (
-              <div
-                key={`sakura-petal-${i}`}
-                className="sakura-petal"
-                style={{
-                  top: `${startY}vh`,
-                  animationDuration: `${animationDuration}s`,
-                  animationDelay: `${animationDelay}s`,
-                  '--drift': `${drift}px`,
-                  '--size': size,
-                }}
-              ></div>
-            );
-          })}
+                  const petal = document.createElement('div');
+                  petal.className = 'sakura-petal';
+                  petal.style.top = `${startY}vh`;
+                  petal.style.animationDuration = `${animationDuration}s`;
+                  petal.style.animationDelay = `${animationDelay}s`;
+                  petal.style.setProperty('--drift', `${drift}px`);
+                  petal.style.setProperty('--size', size.toString());
+
+                  el.appendChild(petal);
+                });
+              }
+            }}
+          ></div>
         </div>
 
         {/* Theme toggle in top right */}
@@ -388,7 +477,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row items-center justify-center text-base sm:text-lg text-muted-foreground font-light space-y-2 sm:space-y-0">
                 <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mr-0 sm:mr-3 text-primary" />
                 <span className="text-center">
-                  {weddingData.venue}, {weddingData.location}
+                  {weddingData.venue[0]} & {weddingData.venue[1]}, {weddingData.location}
                 </span>
               </div>
             </div>
@@ -412,11 +501,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Fixed positioned couple photo that scrolls down and stays centered */}
+        {/* GSAP Animated couple photo that follows path and settles */}
         <div
           ref={(el) => {
             if (el) {
-              // Store reference for GSAP animation
               el.dataset.coupleImage = 'true';
             }
           }}
@@ -424,7 +512,7 @@ export default function Home() {
         >
           <div className="relative w-80 h-80 sm:w-96 sm:h-96 md:w-[28rem] md:h-[28rem] lg:w-[32rem] lg:h-[32rem]">
             <img
-              src="/images/couple/Divya + Bharat.png"
+              src="/images/couple/divya-bharat.png"
               alt="Divya and Bharat"
               className="w-full h-full object-cover rounded-2xl shadow-2xl"
             />
@@ -439,7 +527,7 @@ export default function Home() {
           <div className="absolute -bottom-4 -right-4 w-6 h-6 bg-primary/30 rounded-full blur-sm"></div>
         </div>
 
-        {/* GSAP Scroll Animation - Fixed positioned, spans multiple sections */}
+        {/* GSAP Scroll Animation - SVG Path */}
         <div ref={containerRef} className="relative">
           <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-5">
             <svg
@@ -454,7 +542,7 @@ export default function Home() {
                   <path
                     ref={pathRef}
                     id="motionPath"
-                    d="M260.73,86c-110.45,75.91-176.44,210.72-168,343.25,2,30.9,8,62.47,25.16,88.42,21.19,32.15,57.4,52.35,95,62.24s76.89,10.6,115.75,11.23c41.5.68,83.29,1.35,124.19-5.58s81.33-22,112.26-49.28c33.09-29.22,53.22-70.72,62.7-113.52s9-87.12,6.23-130.84c-2.48-38.41-8.82-80.72-38.67-105.5-24.09-20-57.88-23.52-89.36-23.28-51.62.4-106.76,10.32-143.66,45.93C323.91,246.1,313.41,303,313,355.91c-.67,83.88,20,169.49,68.9,238.12s128,118.3,213,122.18"
+                    d="M260.73,86c-110.45,75.91-176.44,210.72-168,343.25,2,30.9,8,62.47,25.16,88.42,21.19,32.15,57.4,52.35,95,62.24s76.89,10.6,115.75,11.23c41.5.68,83.29,1.35,154.19-5.58s111.33-22,142.26-49.28c53.09-29.22,73.22-70.72,82.7-113.52s24-87.12,21.23-130.84c-2.48-38.41-8.82-80.72-38.67-105.5-24.09-20-57.88-23.52-89.36-23.28-51.62.4-106.76,10.32-143.66,745.93C398.91,1146.1,478.41,2203,563,2355.91c-30,50-60,100-163,150C350,2550,340,2650,380,2750c20,50,20,100,20,150c0,100,0,200,0,300"
                     fill="none"
                     stroke="white"
                     strokeMiterlimit="10"
@@ -463,21 +551,9 @@ export default function Home() {
                 </mask>
               </defs>
 
-              <g id="maskReveal" mask="url(#theMask)">
-                <path
-                  id="arrowPath"
-                  d="M233.66,106.51C139.64,184.72,85,307.94,92.72,429.25c2,30.9,8,62.47,25.16,88.42,21.19,32.15,57.4,52.35,95,62.24s76.89,10.6,115.75,11.23c41.5.68,83.29,1.35,124.19-5.58s81.33-22,112.26-49.28c33.09-29.22,53.22-70.72,62.7-113.52s9-87.12,6.23-130.84c-2.48-38.41-8.82-80.72-38.67-105.5-24.09-20-57.88-23.52-89.36-23.28-51.62.4-106.76,10.32-143.66,45.93C323.91,246.1,313.41,303,313,355.91c-.67,83.88,20,169.49,68.9,238.12C426.77,657,497.06,704,574,714.33"
-                  fill="none"
-                  stroke="white"
-                  strokeMiterlimit="10"
-                  strokeWidth="6"
-                  strokeDasharray="16 28.1"
-                />
-              </g>
-
               {/* Pink jasmine flower as the moving arrow */}
               <g ref={arrowRef} id="pinkFlowerArrow">
-                {/* Outer petals - brighter */}
+                {/* Outer petals */}
                 <ellipse
                   cx="0"
                   cy="-10"
@@ -550,7 +626,7 @@ export default function Home() {
                   opacity="1.0"
                   transform="rotate(315)"
                 />
-                {/* Inner petals - brighter */}
+                {/* Inner petals */}
                 <ellipse
                   cx="0"
                   cy="-7"
@@ -623,7 +699,7 @@ export default function Home() {
                   opacity="1.0"
                   transform="rotate(337.5)"
                 />
-                {/* Center - brighter */}
+                {/* Center */}
                 <circle cx="0" cy="0" r="3.5" fill="#f9a8d4" opacity="1.0" />
                 <circle cx="0" cy="0" r="1.8" fill="#ec4899" opacity="0.9" />
               </g>
@@ -1070,21 +1146,23 @@ export default function Home() {
                               </div>
 
                               {/* Table-like Content */}
-                              <div className="bg-muted/20 rounded-lg p-6 space-y-6">
+                              <div className="bg-muted/20 rounded-lg p-4 sm:p-6 space-y-4 sm:space-y-6">
                                 {/* Attending Row */}
-                                <div className="grid grid-cols-4 gap-4 items-center">
-                                  <div className="font-medium text-foreground text-sm">
+                                <div className="grid grid-cols-4 gap-2 sm:gap-4 items-center">
+                                  <div className="font-medium text-foreground text-xs sm:text-sm">
                                     Attending
                                   </div>
 
                                   {/* Dec 23 - No attendance option, just placeholder */}
                                   <div className="text-center">
-                                    <div className="text-muted-foreground text-sm">—</div>
+                                    <div className="text-muted-foreground text-xs sm:text-sm">
+                                      —
+                                    </div>
                                   </div>
 
                                   {/* Dec 24 - Raaga Riti */}
                                   <div className="text-center">
-                                    <label className="flex flex-col items-center space-y-2 cursor-pointer">
+                                    <label className="flex flex-col items-center space-y-1 sm:space-y-2 cursor-pointer">
                                       <Checkbox
                                         checked={questionnaireData.dec24.attendance}
                                         onCheckedChange={(checked) =>
@@ -1092,10 +1170,10 @@ export default function Home() {
                                         }
                                       />
                                       <div className="text-center">
-                                        <span className="text-sm font-medium text-foreground">
+                                        <span className="text-xs sm:text-sm font-medium text-foreground">
                                           Raaga Riti
                                         </span>
-                                        <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                        <div className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                                           4 - 10 PM
                                         </div>
                                       </div>
@@ -1104,7 +1182,7 @@ export default function Home() {
 
                                   {/* Dec 25 - Wedding */}
                                   <div className="text-center">
-                                    <label className="flex flex-col items-center space-y-2 cursor-pointer">
+                                    <label className="flex flex-col items-center space-y-1 sm:space-y-2 cursor-pointer">
                                       <Checkbox
                                         checked={questionnaireData.dec25.attendance}
                                         onCheckedChange={(checked) =>
@@ -1112,10 +1190,10 @@ export default function Home() {
                                         }
                                       />
                                       <div className="text-center">
-                                        <span className="text-sm font-medium text-foreground">
+                                        <span className="text-xs sm:text-sm font-medium text-foreground">
                                           Wedding
                                         </span>
-                                        <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                        <div className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                                           10:30 AM - 2:30 PM
                                         </div>
                                       </div>
@@ -1127,8 +1205,8 @@ export default function Home() {
                                 <div className="h-px bg-border"></div>
 
                                 {/* Accommodation Row */}
-                                <div className="grid grid-cols-4 gap-4 items-center">
-                                  <div className="font-medium text-foreground text-sm">
+                                <div className="grid grid-cols-4 gap-2 sm:gap-4 items-center">
+                                  <div className="font-medium text-foreground text-xs sm:text-sm">
                                     Accommodation
                                   </div>
 
@@ -1245,21 +1323,19 @@ export default function Home() {
                     <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                   </div>
                   <CardTitle className="text-xl sm:text-2xl font-serif text-foreground">
-                    Ceremony
+                    Raaga Riti
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-center space-y-2 px-4 sm:px-6">
                   <div className="flex items-center justify-center text-base sm:text-lg font-medium text-foreground">
                     <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    4:00 PM
+                    Dec 24th, 4 - 10 PM
                   </div>
                   <div className="flex items-center justify-center text-sm sm:text-base text-muted-foreground">
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                    {weddingData.venue}
+                    {weddingData.venue[1]}, {weddingData.location}
                   </div>
-                  <p className="text-sm sm:text-base text-muted-foreground">
-                    {weddingData.location}
-                  </p>
+                  <p className="text-sm sm:text-base text-muted-foreground">Information</p>
                 </CardContent>
               </Card>
 
@@ -1269,19 +1345,19 @@ export default function Home() {
                     <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                   </div>
                   <CardTitle className="text-xl sm:text-2xl font-serif text-foreground">
-                    Reception
+                    Wedding
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-center space-y-2 px-4 sm:px-6">
                   <div className="flex items-center justify-center text-base sm:text-lg font-medium text-foreground">
                     <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    6:00 PM
+                    Dec 25th, 10:30 AM - 2:30 PM
                   </div>
                   <div className="flex items-center justify-center text-sm sm:text-base text-muted-foreground">
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                    Dinner & Dancing
+                    {weddingData.venue[1]}, {weddingData.location}
                   </div>
-                  <p className="text-sm sm:text-base text-muted-foreground">Same Location</p>
+                  <p className="text-sm sm:text-base text-muted-foreground"> Information</p>
                 </CardContent>
               </Card>
             </div>

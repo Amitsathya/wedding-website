@@ -4,6 +4,7 @@ import { apiClient } from '../lib/api';
 import { Camera, Image } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import PhotoUpload from '../components/PhotoUpload';
 
 export default function Photos() {
   const [photos, setPhotos] = useState([]);
@@ -22,6 +23,11 @@ export default function Photos() {
       console.error('Error fetching photos:', error);
       setLoading(false);
     }
+  };
+
+  const handlePhotoUploaded = (newPhoto) => {
+    // Refresh the photos list after successful upload
+    fetchPhotos();
   };
 
   return (
@@ -54,7 +60,7 @@ export default function Photos() {
                 <div className="w-16 sm:w-24 h-px bg-gradient-to-l from-transparent via-primary/50 to-transparent mx-3 sm:mx-6"></div>
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
               </div>
-              
+
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-foreground mb-4 sm:mb-6 text-shadow px-2">
                 Photo Gallery
               </h1>
@@ -62,6 +68,25 @@ export default function Photos() {
                 Beautiful moments from our wedding day, captured and shared by our loved ones
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Upload Section */}
+        <div className="pb-8 px-4 relative z-10">
+          <div className="max-w-2xl mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-serif text-foreground mb-4">
+                Share Your Photos
+              </h2>
+              <p className="text-muted-foreground">
+                Help us capture every moment by sharing your photos from our special day
+              </p>
+            </div>
+            <PhotoUpload
+              onPhotoUploaded={handlePhotoUploaded}
+              guestToken="anonymous"
+              guestName="Guest"
+            />
           </div>
         </div>
 
@@ -73,23 +98,31 @@ export default function Photos() {
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 animate-pulse">
                   <Camera className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                 </div>
-                <div className="text-lg sm:text-xl text-muted-foreground font-light">Loading photos...</div>
+                <div className="text-lg sm:text-xl text-muted-foreground font-light">
+                  Loading photos...
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                 {photos.map((photo) => (
-                  <Card 
-                    key={photo.id} 
+                  <Card
+                    key={photo.id}
                     className="overflow-hidden hover-lift gradient-card animate-scale-in"
                     style={{ animationDelay: `${Math.random() * 0.5}s` }}
                   >
                     <CardContent className="p-0">
                       <div className="relative group">
-                        <img 
-                          src={photo.thumbnailUrl} 
+                        <img
+                          src={photo.thumbnailUrl}
                           alt="Wedding photo"
                           className="w-full h-48 sm:h-56 object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
                           onClick={() => window.open(photo.fullUrl, '_blank')}
+                          onError={(e) => {
+                            // Fallback to a placeholder if image fails to load
+                            e.target.src =
+                              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzljYTNhZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBhdmFpbGFibGU8L3RleHQ+Cjwvc3ZnPgo=';
+                            e.target.onclick = null; // Remove click handler for placeholder
+                          }}
                         />
                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
@@ -105,7 +138,7 @@ export default function Photos() {
                           {new Date(photo.uploadedAt).toLocaleDateString('en-US', {
                             year: 'numeric',
                             month: 'long',
-                            day: 'numeric'
+                            day: 'numeric',
                           })}
                         </p>
                       </div>
@@ -120,17 +153,23 @@ export default function Photos() {
                 <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
                   <Camera className="w-8 h-8 sm:w-10 sm:h-10 text-muted-foreground" />
                 </div>
-                <h3 className="text-xl sm:text-2xl font-serif text-foreground mb-3 sm:mb-4 px-2">No Photos Yet</h3>
+                <h3 className="text-xl sm:text-2xl font-serif text-foreground mb-3 sm:mb-4 px-2">
+                  No Photos Yet
+                </h3>
                 <p className="text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 max-w-md mx-auto leading-relaxed px-4">
-                  No photos have been shared yet. Check back soon to see beautiful moments from our special day!
+                  No photos have been shared yet. Check back soon to see beautiful moments from our
+                  special day!
                 </p>
-                <Button asChild className="w-full sm:w-auto">
-                  <a href="/" className="text-sm sm:text-base">
-                    Return Home
-                  </a>
-                </Button>
               </div>
             )}
+          </div>{' '}
+          {/* Back to Home */}
+          <div className="text-center pt-6 sm:pt-8">
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <a href="/" className="text-sm sm:text-base">
+                Return Home
+              </a>
+            </Button>
           </div>
         </div>
       </main>

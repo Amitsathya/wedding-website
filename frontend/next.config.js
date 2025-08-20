@@ -9,12 +9,9 @@ const nextConfig = {
 
   // Image optimization
   images: {
-    domains: ['localhost', 'your-s3-bucket.s3.amazonaws.com', 'your-cloudfront-domain.cloudfront.net'],
+    domains: ['localhost', 'your-backend-domain.com', '8b795f8872ab.ngrok-free.app'],
     formats: ['image/webp', 'image/avif'],
   },
-
-  // Enable server-side features for development
-  trailingSlash: true,
 
   // Custom webpack config
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {

@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
 import { apiClient } from '../lib/api';
+import { Button } from '@/components/ui/button';
+import { Camera, Upload } from 'lucide-react';
 
 export default function PhotoUpload({ onPhotoUploaded, guestToken, guestName }) {
   const [uploading, setUploading] = useState(false);
@@ -10,37 +12,23 @@ export default function PhotoUpload({ onPhotoUploaded, guestToken, guestName }) 
     setUploading(true);
 
     try {
-      // Get presigned upload URL
-      const urlResponse = await apiClient.post('/api/photos/upload-url', {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        guestToken: guestToken,
-        guestName: guestName
-      });
+      // Create FormData for direct upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('guestName', guestName || 'Anonymous');
+      
+      if (guestToken) {
+        formData.append('guestToken', guestToken);
+      }
 
-      const { uploadUrl, photoId } = urlResponse.data;
-
-      // Upload file directly to S3
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
+      // Upload directly to backend (no more S3 CORS issues!)
+      const response = await apiClient.post('/api/photos/upload', formData, {
         headers: {
-          'Content-Type': file.type,
+          'Content-Type': 'multipart/form-data',
         },
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
-
-      // Mark upload as complete
-      const completeResponse = await apiClient.post('/api/photos/complete', {
-        photoId,
-        fileName: file.name
-      });
-
-      onPhotoUploaded?.(completeResponse.data);
+      onPhotoUploaded?.(response.data);
       
     } catch (error) {
       console.error('Upload error:', error);
@@ -105,8 +93,8 @@ export default function PhotoUpload({ onPhotoUploaded, guestToken, guestName }) 
     <div className="w-full">
       <div
         className={`
-          border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-          ${dragActive ? 'border-rose-500 bg-rose-50' : 'border-gray-300 hover:border-gray-400'}
+          border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300
+          ${dragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-primary/5'}
           ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
         `}
         onDragEnter={handleDrag}
@@ -126,37 +114,41 @@ export default function PhotoUpload({ onPhotoUploaded, guestToken, guestName }) 
         />
         
         {uploading ? (
-          <div className="space-y-2">
-            <div className="text-xl">📤</div>
-            <p className="text-lg font-semibold text-gray-700">Uploading photos...</p>
-            <div className="w-32 h-2 bg-gray-200 rounded-full mx-auto">
-              <div className="h-2 bg-rose-500 rounded-full animate-pulse"></div>
+          <div className="space-y-4">
+            <Upload className="w-12 h-12 text-primary mx-auto animate-pulse" />
+            <p className="text-lg font-semibold text-foreground">Uploading photos...</p>
+            <div className="w-32 h-2 bg-muted rounded-full mx-auto">
+              <div className="h-2 bg-primary rounded-full animate-pulse"></div>
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
-            <div className="text-4xl">📸</div>
-            <p className="text-lg font-semibold text-gray-700">
-              Share Your Photos
-            </p>
-            <p className="text-sm text-gray-500">
-              Drag and drop photos here, or click to select files
-            </p>
-            <p className="text-xs text-gray-400">
-              Supports JPG, PNG, GIF • Max 10MB per file
-            </p>
+          <div className="space-y-4">
+            <Camera className="w-16 h-16 text-primary mx-auto" />
+            <div className="space-y-2">
+              <p className="text-xl font-semibold text-foreground">
+                Share Your Photos
+              </p>
+              <p className="text-muted-foreground">
+                Drag and drop photos here, or click to select files
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Supports JPG, PNG, GIF • Max 10MB per file
+              </p>
+            </div>
           </div>
         )}
       </div>
       
-      <div className="mt-4 text-center">
-        <button
+      <div className="mt-6 text-center">
+        <Button
           onClick={handleClick}
           disabled={uploading}
-          className="bg-rose-600 text-white px-6 py-2 rounded-md hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          size="lg"
+          className="px-8"
         >
+          <Camera className="w-4 h-4 mr-2" />
           {uploading ? 'Uploading...' : 'Choose Photos'}
-        </button>
+        </Button>
       </div>
     </div>
   );
